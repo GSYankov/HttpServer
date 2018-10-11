@@ -1,6 +1,7 @@
 ﻿using CakesWebApp.Services;
 using IRunesWebApp.Data;
 using SIS.HTTP.Cookies;
+using SIS.HTTP.Enums;
 using SIS.HTTP.Requests;
 using SIS.HTTP.Responses;
 using SIS.WebServer.Results;
@@ -24,12 +25,16 @@ namespace IRunesWebApp.Controllers
 
         private const string HtmlFileExtensions = ".html";
 
+        private const string LayoutViewFileName = "_Layout";
+
+        private const string RenderBodyConstant = "@RenderBody()";
+
         private string GetCurrentControllerName() =>
             this.GetType().Name.Replace(ControllerDefaultName, string.Empty);
 
         protected readonly UserCookieService cookieService;
 
-        protected IDictionary<string,string> ViewBag { get; set; }
+        protected IDictionary<string, string> ViewBag { get; set; }
 
         public BaseController()
         {
@@ -38,7 +43,7 @@ namespace IRunesWebApp.Controllers
             this.ViewBag = new Dictionary<string, string>();
         }
 
-        public bool IsAuthenticated (IHttpRequest request)
+        public bool IsAuthenticated(IHttpRequest request)
         {
             return request.Session.ContainsParameter("username");
         }
@@ -54,13 +59,19 @@ namespace IRunesWebApp.Controllers
 
         protected IHttpResponse View([CallerMemberName] string viewName = "")
         {
+            var layoutView = RootDirectoryRelativePath
+                           + ViewsFolderName
+                           + DirectorySeparator
+                           + LayoutViewFileName
+                           + HtmlFileExtensions;
+
             string filePath = RootDirectoryRelativePath
-                             + ViewsFolderName
-                             + DirectorySeparator
-                             + this.GetCurrentControllerName()
-                             + DirectorySeparator
-                             + viewName
-                             + HtmlFileExtensions;
+                            + ViewsFolderName
+                            + DirectorySeparator
+                            + this.GetCurrentControllerName()
+                            + DirectorySeparator
+                            + viewName
+                            + HtmlFileExtensions;
 
             if (!File.Exists(filePath))
             {
@@ -69,23 +80,34 @@ namespace IRunesWebApp.Controllers
                     SIS.HTTP.Enums.HttpResponseStatusCode.NotFound);
             }
 
-            var filecontent = File.ReadAllText(filePath);
+            var viewContent = BuildViewContent(filePath);
 
-            foreach (var viewBagKey  in ViewBag.Keys)
+            var viewLayout = File.ReadAllText(layoutView);
+
+            var view = viewLayout.Replace(RenderBodyConstant, viewContent);
+
+            var response = new HtmlResult(view, HttpResponseStatusCode.Ok);
+
+            return response;
+        }
+
+        private string BuildViewContent(string filePath)
+        {
+            var viewContent = File.ReadAllText(filePath);
+
+            foreach (var viewBagKey in ViewBag.Keys)
             {
                 var dynamicDataPlaceHolder = $"{{{viewBagKey}}}";
-                if (filecontent.Contains(dynamicDataPlaceHolder))
+                if (viewContent.Contains(dynamicDataPlaceHolder))
                 {
                     var viewBagValue = this.ViewBag[viewBagKey];
-                    filecontent = filecontent.Replace(
+                    viewContent = viewContent.Replace(
                         dynamicDataPlaceHolder,
                         viewBagValue);
                 }
             }
+            return viewContent;
 
-            var response = new HtmlResult(filecontent, SIS.HTTP.Enums.HttpResponseStatusCode.Ok);
-
-            return response;
         }
     }
 }
