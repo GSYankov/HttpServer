@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace CakesWebApp.Services
+namespace Services
 {
     public class HashService : IHashService
     {

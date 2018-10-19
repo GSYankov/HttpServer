@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using SIS.HTTP.Cookies;
 using SIS.HTTP.Enums;
+using SIS.WebServer.Api.Contracts;
+
 namespace SIS.WebServer
 {
     using HTTP.Common;
@@ -13,27 +16,24 @@ namespace SIS.WebServer
     using HTTP.Sessions;
     using Results;
     using Routing;
-    using System.IO;
-    using System.Linq;
-    using System.Reflection;
 
     public class ConnectionHandler
     {
         private readonly Socket client;
 
-        private readonly ServerRoutingTable serverRoutingTable;
-
         private const string RootDirectoryRelativePath = "../../..";
+
+        private readonly IHttpHandlingContext handlersContext;
 
         public ConnectionHandler(
             Socket client,
-            ServerRoutingTable serverRoutingTable)
+            IHttpHandlingContext handlersContext)
         {
             CoreValidator.ThrowIfNull(client, nameof(client));
-            CoreValidator.ThrowIfNull(serverRoutingTable, nameof(serverRoutingTable));
+            CoreValidator.ThrowIfNull(handlersContext, nameof(handlersContext));
 
             this.client = client;
-            this.serverRoutingTable = serverRoutingTable;
+            this.handlersContext = handlersContext;
         }
 
         private async Task<IHttpRequest> ReadRequest()
@@ -65,64 +65,6 @@ namespace SIS.WebServer
             }
 
             return new HttpRequest(result.ToString());
-        }
-
-        private IHttpResponse HandleRequest(IHttpRequest httpRequest)
-        {
-            var isResourceRequest = this.IsResourceRequest(httpRequest);
-
-            if (isResourceRequest)
-            {
-                return this.HandleRequestResponse(httpRequest.Path);
-            }
-
-            if (!this.serverRoutingTable.Routes.ContainsKey(httpRequest.RequestMethod)
-                            || !this.serverRoutingTable.Routes[httpRequest.RequestMethod].ContainsKey(httpRequest.Path))
-            {
-                return new HttpResponse(HttpResponseStatusCode.NotFound);
-            }
-
-
-            return this.serverRoutingTable.Routes[httpRequest.RequestMethod][httpRequest.Path].Invoke(httpRequest);
-        }
-
-        private IHttpResponse HandleRequestResponse(string httpRequestPath)
-        {
-            var indexOfStartOfExtension = httpRequestPath.LastIndexOf('.');
-            var indexOfStartOfResourceName = httpRequestPath.LastIndexOf('/');
-
-            var requestPathExtension = httpRequestPath
-                    .Substring(indexOfStartOfExtension);
-
-            var resourceName = httpRequestPath
-                               .Substring(indexOfStartOfResourceName);
-
-            var resourcePath = RootDirectoryRelativePath
-                              + "/Resources"
-                              + $"/{requestPathExtension.Substring(1)}"
-                              + resourceName;
-
-            if (!File.Exists(resourcePath))
-            {
-                return new HttpResponse(HttpResponseStatusCode.NotFound);
-            }
-
-            var fileContent = File.ReadAllBytes(resourcePath);
-
-            return new InlineResourceResult(fileContent, HttpResponseStatusCode.Ok);
-        }
-        private bool IsResourceRequest(IHttpRequest httpRequest)
-        {
-            var requestPath = httpRequest.Path;
-            if (requestPath.Contains('.'))
-            {
-                var requestPathExtension = requestPath
-                    .Substring(requestPath.LastIndexOf('.'));
-                return GlobalConstants.ResoureExtensions
-                    .Contains(requestPathExtension);
-            }
-
-            return false;
         }
 
         private async Task PrepareResponse(IHttpResponse httpResponse)
@@ -171,7 +113,7 @@ namespace SIS.WebServer
                 {
                     string sessionId = this.SetRequestSession(httpRequest);
 
-                    var httpResponse = this.HandleRequest(httpRequest);
+                    var httpResponse = this.handlersContext.Handle(httpRequest);
 
                     this.SetResponseSession(httpResponse, sessionId);
 

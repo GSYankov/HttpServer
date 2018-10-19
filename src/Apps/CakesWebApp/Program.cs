@@ -35,9 +35,9 @@ namespace CakesWebApp
             serverRoutingTable.Routes[HttpRequestMethod.Get]["/cakes/view"] = request =>
                 new CakesController().ById(request);
 
-            Server server = new Server(80, serverRoutingTable);
+            //Server server = new Server(80, serverRoutingTable);
 
-            server.Run();
+           // server.Run();
         }
     }
 }

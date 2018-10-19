@@ -1,10 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace CakesWebApp.Services
+namespace Services
 {
     public class UserCookieService : IUserCookieService
     {
